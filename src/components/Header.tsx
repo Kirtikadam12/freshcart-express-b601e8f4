@@ -1,8 +1,16 @@
-import { Search, ShoppingCart, MapPin, User, ChevronDown } from "lucide-react";
+import { Search, ShoppingCart, MapPin, User, ChevronDown, LogOut } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface HeaderProps {
   searchQuery: string;
@@ -11,6 +19,7 @@ interface HeaderProps {
 
 export function Header({ searchQuery, onSearchChange }: HeaderProps) {
   const { totalItems, totalPrice, setIsCartOpen } = useCart();
+  const { user, signOut } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 bg-card border-b border-border shadow-soft">
@@ -59,9 +68,31 @@ export function Header({ searchQuery, onSearchChange }: HeaderProps) {
 
           {/* Actions */}
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <User className="h-5 w-5" />
-            </Button>
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem className="text-muted-foreground text-xs">
+                    {user.email}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => signOut()} className="text-destructive">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/auth">
+                  <User className="h-5 w-5 mr-2" />
+                  Login
+                </Link>
+              </Button>
+            )}
             
             <Button
               variant="fresh"
