@@ -1,35 +1,46 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, ShoppingBag, Truck } from "lucide-react";
 import { z } from "zod";
+import { cn } from "@/lib/utils";
 
 const authSchema = z.object({
   email: z.string().trim().email({ message: "Please enter a valid email address" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 });
 
+type SelectedRole = "buyer" | "delivery";
+
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState<SelectedRole>("buyer");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
   const { signIn, signUp, user, loading } = useAuth();
+  const { role, loading: roleLoading, assignRole } = useUserRole();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!loading && user) {
-      navigate("/");
+    if (!loading && !roleLoading && user) {
+      if (role === "delivery") {
+        navigate("/delivery");
+      } else if (role === "buyer") {
+        navigate("/");
+      }
+      // If no role yet, stay on page to let them complete signup flow
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, role, roleLoading, navigate]);
 
   const validateForm = () => {
     const result = authSchema.safeParse({ email, password });
@@ -82,10 +93,19 @@ export default function Auth() {
             description: message,
           });
         } else {
-          toast({
-            title: "Account created!",
-            description: "Welcome to FreshCart. Start shopping!",
-          });
+          // Wait a bit for auth state to update, then assign role
+          setTimeout(async () => {
+            const { error: roleError } = await assignRole(selectedRole);
+            if (roleError) {
+              console.error("Error assigning role:", roleError);
+            }
+            toast({
+              title: "Account created!",
+              description: selectedRole === "delivery" 
+                ? "Welcome to FreshCart Delivery!"
+                : "Welcome to FreshCart. Start shopping!",
+            });
+          }, 500);
         }
       }
     } finally {
@@ -93,7 +113,7 @@ export default function Auth() {
     }
   };
 
-  if (loading) {
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -127,13 +147,65 @@ export default function Auth() {
             </CardTitle>
             <CardDescription>
               {isLogin 
-                ? "Sign in to continue shopping fresh produce" 
-                : "Join FreshCart for farm-fresh vegetables & fruits"}
+                ? "Sign in to continue" 
+                : "Join FreshCart as a buyer or delivery partner"}
             </CardDescription>
           </CardHeader>
           
           <CardContent className="pt-4">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Role Selection - Only show for signup */}
+              {!isLogin && (
+                <div className="space-y-2">
+                  <Label>I want to</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRole("buyer")}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
+                        selectedRole === "buyer"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center",
+                        selectedRole === "buyer" ? "bg-primary text-primary-foreground" : "bg-muted"
+                      )}>
+                        <ShoppingBag className="h-6 w-6" />
+                      </div>
+                      <span className="font-medium text-sm">Shop & Buy</span>
+                      <span className="text-xs text-muted-foreground text-center">
+                        Order fresh produce
+                      </span>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRole("delivery")}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
+                        selectedRole === "delivery"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center",
+                        selectedRole === "delivery" ? "bg-primary text-primary-foreground" : "bg-muted"
+                      )}>
+                        <Truck className="h-6 w-6" />
+                      </div>
+                      <span className="font-medium text-sm">Deliver</span>
+                      <span className="text-xs text-muted-foreground text-center">
+                        Earn by delivering
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

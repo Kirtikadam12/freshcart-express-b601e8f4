@@ -1,9 +1,10 @@
-import { Search, ShoppingCart, MapPin, User, ChevronDown, LogOut } from "lucide-react";
+import { Search, ShoppingCart, MapPin, User, ChevronDown, LogOut, Truck } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -20,6 +21,7 @@ interface HeaderProps {
 export function Header({ searchQuery, onSearchChange }: HeaderProps) {
   const { totalItems, totalPrice, setIsCartOpen } = useCart();
   const { user, signOut } = useAuth();
+  const { role } = useUserRole();
 
   return (
     <header className="sticky top-0 z-50 bg-card border-b border-border shadow-soft">
@@ -79,6 +81,14 @@ export function Header({ searchQuery, onSearchChange }: HeaderProps) {
                   <DropdownMenuItem className="text-muted-foreground text-xs">
                     {user.email}
                   </DropdownMenuItem>
+                  {role === "delivery" && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/delivery" className="flex items-center">
+                        <Truck className="h-4 w-4 mr-2" />
+                        Delivery Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => signOut()} className="text-destructive">
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign out
