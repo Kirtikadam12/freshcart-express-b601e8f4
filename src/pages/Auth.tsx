@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft, ShoppingBag, Truck } from "lucide-react";
+import { Loader2, ArrowLeft, ShoppingBag, Truck, Store } from "lucide-react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 
@@ -16,15 +16,16 @@ const authSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 });
 
-type SelectedRole = "buyer" | "delivery";
+type SelectedRole = "buyer" | "delivery" | "seller" | null;
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedRole, setSelectedRole] = useState<SelectedRole>("buyer");
+  const [selectedRole, setSelectedRole] = useState<SelectedRole>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [roleError, setRoleError] = useState<string | null>(null);
   
   const { signIn, signUp, user, loading } = useAuth();
   const { role, loading: roleLoading, assignRole } = useUserRole();
@@ -34,7 +35,9 @@ export default function Auth() {
   useEffect(() => {
     if (!loading && !roleLoading && user) {
       if (role === "delivery") {
-        navigate("/delivery");
+        navigate("/delivery/dashboard");
+      } else if (role === "seller") {
+        navigate("/seller/dashboard");
       } else if (role === "buyer") {
         navigate("/");
       }
@@ -61,7 +64,13 @@ export default function Auth() {
     e.preventDefault();
     
     if (!validateForm()) return;
-    
+
+    if (!isLogin && !selectedRole) {
+      setRoleError("Please select a role to continue.");
+      return;
+    }
+
+    setRoleError(null); // Clear previous role error if any
     setIsLoading(true);
 
     try {
@@ -75,15 +84,19 @@ export default function Auth() {
               ? "Invalid email or password. Please try again."
               : error.message,
           });
+          setIsLoading(false);
         } else {
           toast({
             title: "Welcome back!",
             description: "You have successfully logged in.",
           });
+          setIsLoading(false);
+          // Redirection will be handled by useEffect based on assigned role
         }
       } else {
         const { error } = await signUp(email, password);
         if (error) {
+          setIsLoading(false);
           const message = error.message.includes("already registered")
             ? "This email is already registered. Please login instead."
             : error.message;
@@ -93,23 +106,51 @@ export default function Auth() {
             description: message,
           });
         } else {
-          // Wait a bit for auth state to update, then assign role
-          setTimeout(async () => {
-            const { error: roleError } = await assignRole(selectedRole);
-            if (roleError) {
-              console.error("Error assigning role:", roleError);
-            }
+          // Proceed directly to role assignment
+          const { error: roleError } = await assignRole(selectedRole);
+          
+          if (roleError) {
+            console.error("Error assigning role:", roleError);
+            const errorMessage = roleError.message || "Unknown error occurred";
             toast({
-              title: "Account created!",
-              description: selectedRole === "delivery" 
-                ? "Welcome to FreshCart Delivery!"
-                : "Welcome to FreshCart. Start shopping!",
+              variant: "destructive",
+              title: "Role assignment failed",
+              description: errorMessage.includes("No user logged in")
+                ? "Please wait a moment and try again, or refresh the page."
+                : `There was an issue assigning your role: ${errorMessage}`,
             });
-          }, 500);
+            setIsLoading(false);
+            return;
+          }
+
+          // Stop loading state before redirect
+          setIsLoading(false);
+
+          let description = "";
+          let redirectPath = "/";
+          
+          if (selectedRole === "delivery") {
+            description = "Welcome to FreshCart Delivery!";
+            redirectPath = "/delivery/dashboard";
+          } else if (selectedRole === "seller") {
+            description = "Welcome to FreshCart Seller! Start managing your products.";
+            redirectPath = "/seller/dashboard";
+          } else {
+            description = "Welcome to FreshCart. Start shopping!";
+            redirectPath = "/";
+          }
+
+          toast({
+            title: "Account created!",
+            description: description,
+          });
+
+          // Immediately redirect after role assignment
+          navigate(redirectPath);
         }
       }
     } finally {
-      setIsLoading(false);
+      // setIsLoading(false); // This will be handled by useEffect after redirection or if role assignment fails
     }
   };
 
@@ -148,7 +189,7 @@ export default function Auth() {
             <CardDescription>
               {isLogin 
                 ? "Sign in to continue" 
-                : "Join FreshCart as a buyer or delivery partner"}
+                : "Join FreshCart as a buyer, seller, or delivery partner"}
             </CardDescription>
           </CardHeader>
           
@@ -158,10 +199,13 @@ export default function Auth() {
               {!isLogin && (
                 <div className="space-y-2">
                   <Label>I want to</Label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
                       type="button"
-                      onClick={() => setSelectedRole("buyer")}
+                      onClick={() => {
+                        setSelectedRole("buyer");
+                        setRoleError(null);
+                      }}
                       className={cn(
                         "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
                         selectedRole === "buyer"
@@ -183,7 +227,35 @@ export default function Auth() {
                     
                     <button
                       type="button"
-                      onClick={() => setSelectedRole("delivery")}
+                      onClick={() => {
+                        setSelectedRole("seller");
+                        setRoleError(null);
+                      }}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
+                        selectedRole === "seller"
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center",
+                        selectedRole === "seller" ? "bg-primary text-primary-foreground" : "bg-muted"
+                      )}>
+                        <Store className="h-6 w-6" />
+                      </div>
+                      <span className="font-medium text-sm">Sell</span>
+                      <span className="text-xs text-muted-foreground text-center">
+                        Manage your store
+                      </span>
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRole("delivery");
+                        setRoleError(null);
+                      }}
                       className={cn(
                         "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
                         selectedRole === "delivery"
@@ -203,6 +275,9 @@ export default function Auth() {
                       </span>
                     </button>
                   </div>
+                  {roleError && (
+                    <p className="text-sm text-destructive mt-2">{roleError}</p>
+                  )}
                 </div>
               )}
 
@@ -265,6 +340,8 @@ export default function Auth() {
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setErrors({});
+                  setRoleError(null);
+                  setSelectedRole(null);
                 }}
                 className="text-primary font-semibold"
               >

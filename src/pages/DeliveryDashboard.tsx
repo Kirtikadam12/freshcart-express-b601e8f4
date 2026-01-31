@@ -13,7 +13,7 @@ interface Order {
   id: string;
   buyer_id: string;
   status: string;
-  items: { name: string; quantity: number; price: number }[];
+  order_items: { name: string; quantity: number; price: number }[];
   total_amount: number;
   delivery_address: string;
   created_at: string;
@@ -52,17 +52,14 @@ export default function DeliveryDashboard() {
     setLoadingOrders(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("*")
+      .select("*, order_items(name, quantity, price)" as any)
       .or(`delivery_id.eq.${user?.id},delivery_id.is.null`)
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error("Error fetching orders:", error);
     } else {
-      const typedOrders = (data || []).map(order => ({
-        ...order,
-        items: order.items as { name: string; quantity: number; price: number }[]
-      }));
+      const typedOrders = (data || []) as unknown as Order[];
       setOrders(typedOrders);
       
       const pending = typedOrders.filter(o => o.status === "pending").length;
@@ -77,10 +74,25 @@ export default function DeliveryDashboard() {
     setLoadingOrders(false);
   };
 
+  // Realtime subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel("delivery-orders")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => fetchOrders()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const acceptOrder = async (orderId: string) => {
     const { error } = await supabase
       .from("orders")
-      .update({ delivery_id: user?.id, status: "assigned" })
+      .update({ delivery_id: user?.id, status: "assigned" } as any)
       .eq("id", orderId);
 
     if (error) {
@@ -264,7 +276,7 @@ export default function DeliveryDashboard() {
                     <div className="mb-3">
                       <p className="text-sm text-muted-foreground mb-1">Items:</p>
                       <div className="flex flex-wrap gap-2">
-                        {order.items.map((item, idx) => (
+                        {order.order_items?.map((item, idx) => (
                           <Badge key={idx} variant="secondary">
                             {item.name} x{item.quantity}
                           </Badge>

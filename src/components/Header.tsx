@@ -1,4 +1,4 @@
-import { Search, ShoppingCart, MapPin, User, ChevronDown, LogOut, Truck } from "lucide-react";
+import { Search, ShoppingCart, MapPin, User, ChevronDown, LogOut, Truck, Store, Package } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSellerOrderAlert } from "@/hooks/useSellerOrderAlert";
 
 interface HeaderProps {
   searchQuery: string;
@@ -19,9 +20,10 @@ interface HeaderProps {
 }
 
 export function Header({ searchQuery, onSearchChange }: HeaderProps) {
-  const { totalItems, totalPrice, setIsCartOpen } = useCart();
+  const { totalItems, totalPrice } = useCart();
   const { user, signOut } = useAuth();
   const { role } = useUserRole();
+  useSellerOrderAlert();
 
   return (
     <header className="sticky top-0 z-50 bg-card border-b border-border shadow-soft">
@@ -81,6 +83,26 @@ export function Header({ searchQuery, onSearchChange }: HeaderProps) {
                   <DropdownMenuItem className="text-muted-foreground text-xs">
                     {user.email}
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" className="flex items-center">
+                      <User className="h-4 w-4 mr-2" />
+                      My Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/my-orders" className="flex items-center">
+                      <Package className="h-4 w-4 mr-2" />
+                      My Orders
+                    </Link>
+                  </DropdownMenuItem>
+                  {role === "seller" && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/seller/dashboard" className="flex items-center">
+                        <Store className="h-4 w-4 mr-2" />
+                        Seller Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   {role === "delivery" && (
                     <DropdownMenuItem asChild>
                       <Link to="/delivery" className="flex items-center">
@@ -107,20 +129,22 @@ export function Header({ searchQuery, onSearchChange }: HeaderProps) {
             <Button
               variant="fresh"
               size="lg"
-              onClick={() => setIsCartOpen(true)}
+              asChild
               className="relative gap-3 px-6"
             >
-              <ShoppingCart className="h-5 w-5" />
-              {totalItems > 0 && (
-                <>
-                  <span className="hidden sm:inline">{totalItems} items</span>
-                  <span className="font-bold">₹{totalPrice}</span>
-                  <Badge className="absolute -top-2 -right-2 h-6 w-6 p-0 flex items-center justify-center bg-citrus-orange text-primary-foreground border-2 border-card">
-                    {totalItems}
-                  </Badge>
-                </>
-              )}
-              {totalItems === 0 && <span className="hidden sm:inline">Cart</span>}
+              <Link to="/cart">
+                <ShoppingCart className="h-5 w-5" />
+                {totalItems > 0 && (
+                  <>
+                    <span className="hidden sm:inline">{totalItems} items</span>
+                    <span className="font-bold">₹{totalPrice}</span>
+                    <Badge className="absolute -top-2 -right-2 h-6 w-6 p-0 flex items-center justify-center bg-citrus-orange text-primary-foreground border-2 border-card">
+                      {totalItems}
+                    </Badge>
+                  </>
+                )}
+                {totalItems === 0 && <span className="hidden sm:inline">Cart</span>}
+              </Link>
             </Button>
           </div>
         </div>

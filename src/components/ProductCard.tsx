@@ -1,115 +1,143 @@
-import { Plus, Minus } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { useCart } from "@/contexts/CartContext";
-import type { Product } from "@/data/products";
+import { useToast } from "@/hooks/use-toast";
+import { Minus, Plus } from "lucide-react";
+
+// Shared Product interface
+interface Product {
+  id: string;
+  name: string;
+  category: "fruit" | "vegetable";
+  price: number;
+  stock: number;
+  image_url: string;
+}
 
 interface ProductCardProps {
   product: Product;
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { items, addItem, updateQuantity } = useCart();
-  const cartItem = items.find((item) => item.id === product.id);
-  const quantity = cartItem?.quantity || 0;
+  const { addItem, setIsCartOpen } = useCart();
+  const { toast } = useToast();
+  const [quantity, setQuantity] = useState(1);
 
-  const handleAdd = () => {
+  const handleIncrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (quantity < product.stock) {
+      setQuantity((prev) => prev + 1);
+    }
+  };
+
+  const handleDecrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (quantity > 1) {
+      setQuantity((prev) => prev - 1);
+    }
+  };
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     addItem({
       id: product.id,
       name: product.name,
       price: product.price,
-      unit: product.unit,
-      image: product.image,
+      image: product.image_url,
+      quantity: quantity,
+      unit: "kg",
+    });
+    toast({
+      title: "Added to cart",
+      description: `${quantity} x ${product.name} has been added to your cart.`,
     });
   };
 
+  const handleBuyNow = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image_url,
+      quantity: quantity,
+      unit: "kg",
+    });
+    setIsCartOpen(true);
+  };
+
   return (
-    <div className="group bg-card rounded-2xl border border-border overflow-hidden shadow-soft hover:shadow-card transition-all duration-300 animate-fade-in">
-      {/* Image container */}
-      <div className="relative aspect-square overflow-hidden bg-muted">
-        <img
-          src={product.image}
-          alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
-        
-        {/* Badge */}
-        {product.badge && (
-          <Badge
-            className={`absolute top-3 left-3 ${
-              product.badge.includes("OFF")
-                ? "bg-citrus-orange"
-                : product.badge === "Organic"
-                ? "bg-primary"
-                : product.badge === "Premium"
-                ? "gradient-citrus"
-                : "bg-secondary text-secondary-foreground"
-            } text-primary-foreground font-semibold px-3 py-1`}
-          >
-            {product.badge}
-          </Badge>
-        )}
-
-        {/* Quick add overlay */}
-        {quantity === 0 && (
-          <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/5 transition-colors duration-300" />
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="p-4 space-y-3">
-        <div>
-          <h3 className="font-semibold text-foreground text-base line-clamp-1 group-hover:text-primary transition-colors">
-            {product.name}
-          </h3>
-          <p className="text-sm text-muted-foreground">{product.unit}</p>
+    <Card className="group relative flex flex-col">
+      <CardHeader className="p-0">
+        <div className="aspect-h-1 aspect-w-1 w-full overflow-hidden rounded-t-lg bg-gray-200 lg:aspect-none group-hover:opacity-75 h-64">
+          <img
+            src={product.image_url}
+            alt={product.name}
+            className="h-full w-full object-cover object-center"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://via.placeholder.com/300?text=No+Image";
+              (e.target as HTMLImageElement).classList.add('object-scale-down');
+            }}
+          />
         </div>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-foreground">₹{product.price}</span>
-            {product.originalPrice && (
-              <span className="text-sm text-muted-foreground line-through">
-                ₹{product.originalPrice}
-              </span>
-            )}
-          </div>
-
-          {/* Add to cart */}
-          {quantity === 0 ? (
+      </CardHeader>
+      <CardContent className="mt-4 flex justify-between flex-grow">
+        <div>
+          <h3 className="text-base font-semibold text-gray-800">
+            {/* The anchor tag can be replaced with a Link component from react-router-dom */}
+            <a href={`/product/${product.id}`}>
+              <span aria-hidden="true" className="absolute inset-0" />
+              {product.name}
+            </a>
+          </h3>
+          <p className="mt-1 text-sm text-gray-500 capitalize">{product.category}</p>
+        </div>
+        <p className="text-base font-bold text-gray-900">₹{product.price.toFixed(2)}</p>
+      </CardContent>
+      <CardFooter className="p-4 flex flex-col gap-3">
+        {product.stock > 0 && (
+          <div className="flex items-center gap-2 relative z-10">
             <Button
-              variant="cart"
-              size="icon-sm"
-              onClick={handleAdd}
-              className="opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleDecrement}
+              disabled={quantity <= 1}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <span className="w-8 text-center font-medium">{quantity}</span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleIncrement}
+              disabled={quantity >= product.stock}
             >
               <Plus className="h-4 w-4" />
             </Button>
-          ) : (
-            <div className="flex items-center gap-2 bg-primary rounded-full p-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => updateQuantity(product.id, quantity - 1)}
-                className="h-7 w-7 rounded-full text-primary-foreground hover:bg-primary-foreground/20"
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-              <span className="text-sm font-bold text-primary-foreground min-w-[20px] text-center">
-                {quantity}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => updateQuantity(product.id, quantity + 1)}
-                className="h-7 w-7 rounded-full text-primary-foreground hover:bg-primary-foreground/20"
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+          </div>
+        )}
+        {product.stock > 0 ? (
+          <div className="flex gap-2 w-full relative z-10">
+            <Button className="flex-1" variant="outline" onClick={handleAddToCart}>
+              Add to Cart
+            </Button>
+            <Button className="flex-1" onClick={handleBuyNow}>
+              Buy Now
+            </Button>
+          </div>
+        ) : (
+          <Button className="w-full relative z-10" disabled>
+            Out of Stock
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
   );
 }

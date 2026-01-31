@@ -1,13 +1,110 @@
-import { X, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { X, Minus, Plus, ShoppingBag, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 export function CartDrawer() {
   const { items, isCartOpen, setIsCartOpen, updateQuantity, removeItem, totalPrice, clearCart } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   const deliveryFee = totalPrice >= 200 ? 0 : 25;
   const grandTotal = totalPrice + deliveryFee;
+
+  const handleCheckout = async () => {
+    if (!user) {
+      setIsCartOpen(false);
+      navigate("/auth");
+      return;
+    }
+
+    setIsCheckingOut(true);
+
+    try {
+      // 1. Fetch seller_id for all items in cart to group orders if necessary
+      // For this implementation, we'll assume we create one order. 
+      // If multiple sellers exist, we pick the first one or null (platform order).
+      // Ideally, you'd group items by seller_id and create multiple orders.
+      
+      const productIds = items.map(item => item.id);
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, seller_id' as any)
+        .in('id', productIds);
+
+      if (productsError) throw productsError;
+
+      // Simple strategy: Use the seller_id of the first product found
+      const sellerId = (products?.[0] as any)?.seller_id || null;
+
+      // Fetch user profile for delivery address
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('address')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      const deliveryAddress = profiles?.[0]?.address || 'Address not provided';
+
+      // 2. Create the Order
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          buyer_id: user.id,
+          seller_id: sellerId,
+          total_amount: grandTotal,
+          status: 'pending',
+          delivery_address: deliveryAddress
+        } as any)
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+      if (!order) throw new Error("Failed to create order");
+
+      // 3. Create Order Items
+      const orderItemsData = items.map(item => ({
+        order_id: order.id,
+        product_id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItemsData as any);
+
+      if (itemsError) throw itemsError;
+
+      // Success
+      toast({
+        title: "Order Placed Successfully!",
+        description: `Order #${order.id.slice(0, 8)} has been created.`,
+      });
+      
+      clearCart();
+      setIsCartOpen(false);
+      navigate("/my-orders");
+
+    } catch (error: any) {
+      console.error("Checkout error:", error);
+      toast({
+        variant: "destructive",
+        title: "Checkout Failed",
+        description: error.message || "Something went wrong. Please try again.",
+      });
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
 
   return (
     <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
@@ -125,8 +222,21 @@ export function CartDrawer() {
                 </div>
               </div>
 
-              <Button variant="fresh" size="lg" className="w-full text-base">
-                Proceed to Checkout
+              <Button 
+                variant="fresh" 
+                size="lg" 
+                className="w-full text-base"
+                onClick={handleCheckout}
+                disabled={isCheckingOut}
+              >
+                {isCheckingOut ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  "Proceed to Checkout"
+                )}
               </Button>
             </div>
           </>
