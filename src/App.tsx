@@ -19,7 +19,18 @@ import NotFound from "./pages/NotFound";
 import Cart from "./pages/Cart";
 import ProtectedRoute from "./components/ProtectedRoute";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Prevents immediate refetching when clicking between windows, helpful for debugging
+      refetchOnWindowFocus: false,
+      // Fail faster during development so you see errors immediately
+      retry: 1,
+      // Consider data stale immediately so it always checks with the server
+      staleTime: 0,
+    },
+  },
+});
 
 const App = () => (
   <BrowserRouter>

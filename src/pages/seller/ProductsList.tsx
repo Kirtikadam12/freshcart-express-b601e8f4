@@ -26,7 +26,7 @@ interface SellerProduct {
   name: string;
   category: "fruit" | "vegetable";
   price: number;
-  stock: number;
+  stock?: number;
   image_url: string;
   created_at: string;
   updated_at: string;
@@ -53,7 +53,7 @@ export default function ProductsList() {
       setLoading(true);
       const { data, error } = await supabase
         .from("products")
-        .select("*")
+        .select("id, seller_id, name, category, price, image_url, created_at, updated_at")
         .eq("seller_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -65,7 +65,7 @@ export default function ProductsList() {
           description: "Failed to load products. Please try again.",
         });
       } else {
-        data || [];
+        setProducts((data as SellerProduct[]) || []);
       }
     } catch (err) {
       console.error("Unexpected error:", err);

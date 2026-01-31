@@ -55,7 +55,7 @@ export default function ProductGrid({ selectedCategory, searchQuery }: ProductGr
         console.error("Error fetching products:", error);
         setError("Failed to load products. Please try again.");
       } else {
-        data || [];
+        setProducts(data || []);
       }
       setLoading(false);
     };
