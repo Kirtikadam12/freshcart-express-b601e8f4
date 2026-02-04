@@ -9,9 +9,11 @@ import { Link } from "react-router-dom";
 
 interface OrderItem {
   id: string;
-  name: string;
   quantity: number;
   price: number;
+  products: {
+    name: string;
+  } | null;
 }
 
 interface Order {
@@ -19,7 +21,6 @@ interface Order {
   created_at: string;
   total_amount: number;
   status: string;
-  delivery_address: string;
   order_items: OrderItem[];
 }
 
@@ -30,21 +31,25 @@ export default function MyOrders() {
 
   useEffect(() => {
     if (!user) return;
-
-    const fetchOrders = async () => {
+    async function fetchOrders() {
       setLoading(true);
       const { data, error } = await supabase
         .from("orders")
-        .select(`
-          *,
+        .select(
+          `
+          id,
+          created_at,
+          total_amount,
+          status,
           order_items (
             id,
-            name,
             quantity,
-            price
+            price,
+            products ( name )
           )
-        ` as any)
-        .eq("buyer_id", user.id)
+        `
+        as any)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -53,7 +58,7 @@ export default function MyOrders() {
         setOrders((data as any) || []);
       }
       setLoading(false);
-    };
+    }
 
     fetchOrders();
   }, [user]);
@@ -136,11 +141,6 @@ export default function MyOrders() {
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="space-y-6">
-                  <div className="flex items-start gap-3 text-sm text-muted-foreground bg-muted/20 p-3 rounded-md">
-                    <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
-                    <span>{order.delivery_address || "No delivery address provided"}</span>
-                  </div>
-                  
                   <div>
                     <h4 className="font-medium mb-3 text-sm uppercase tracking-wider text-muted-foreground">Items</h4>
                     <div className="space-y-3">
@@ -150,7 +150,7 @@ export default function MyOrders() {
                             <span className="font-medium bg-muted w-8 h-8 flex items-center justify-center rounded-full text-xs">
                               {item.quantity}x
                             </span>
-                            <span>{item.name}</span>
+                            <span>{item.products?.name || "Product not found"}</span>
                           </div>
                           <span className="font-medium">₹{(item.price * item.quantity).toFixed(2)}</span>
                         </div>

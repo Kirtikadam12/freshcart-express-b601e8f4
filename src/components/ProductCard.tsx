@@ -20,14 +20,18 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { addItem, setIsCartOpen } = useCart();
+  const { addItem, setIsCartOpen, items, updateQuantity } = useCart();
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
+
+  const cartItem = items.find((item) => item.id === product.id);
+  const quantityInCart = cartItem ? cartItem.quantity : 0;
+  const availableStock = Math.max(0, product.stock - quantityInCart);
 
   const handleIncrement = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (quantity < product.stock) {
+    if (quantity < availableStock) {
       setQuantity((prev) => prev + 1);
     }
   };
@@ -43,31 +47,67 @@ export function ProductCard({ product }: ProductCardProps) {
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.image_url,
-      quantity: quantity,
-      unit: "kg",
-    });
-    toast({
-      title: "Added to cart",
-      description: `${quantity} x ${product.name} has been added to your cart.`,
-    });
+
+    if (quantity > availableStock) {
+      toast({
+        variant: "destructive",
+        title: "Stock Limit Reached",
+        description: `You already have ${quantityInCart} in your cart. Only ${availableStock} more available.`,
+      });
+      return;
+    }
+
+    const existingItem = items.find((item) => item.id === product.id);
+    if (existingItem) {
+      updateQuantity(product.id, existingItem.quantity + quantity);
+      toast({
+        title: "Cart updated",
+        description: `${quantity} more ${product.name} added to cart.`,
+      });
+    } else {
+      addItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image_url,
+        quantity: quantity,
+        unit: "kg",
+      });
+      toast({
+        title: "Added to cart",
+        description: `${quantity} x ${product.name} has been added to your cart.`,
+      });
+    }
+    setQuantity(1);
   };
 
   const handleBuyNow = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.image_url,
-      quantity: quantity,
-      unit: "kg",
-    });
+
+    if (quantity > availableStock) {
+      toast({
+        variant: "destructive",
+        title: "Stock Limit Reached",
+        description: `You already have ${quantityInCart} in your cart. Only ${availableStock} more available.`,
+      });
+      return;
+    }
+
+    const existingItem = items.find((item) => item.id === product.id);
+    if (existingItem) {
+      updateQuantity(product.id, existingItem.quantity + quantity);
+    } else {
+      addItem({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image_url,
+        quantity: quantity,
+        unit: "kg",
+      });
+    }
+    setQuantity(1);
     setIsCartOpen(true);
   };
 
@@ -117,7 +157,7 @@ export function ProductCard({ product }: ProductCardProps) {
               size="icon"
               className="h-8 w-8"
               onClick={handleIncrement}
-              disabled={quantity >= product.stock}
+              disabled={quantity >= availableStock}
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -125,10 +165,10 @@ export function ProductCard({ product }: ProductCardProps) {
         )}
         {product.stock > 0 ? (
           <div className="flex gap-2 w-full relative z-10">
-            <Button className="flex-1" variant="outline" onClick={handleAddToCart}>
+            <Button className="flex-1" variant="outline" onClick={handleAddToCart} disabled={availableStock === 0}>
               Add to Cart
             </Button>
-            <Button className="flex-1" onClick={handleBuyNow}>
+            <Button className="flex-1" onClick={handleBuyNow} disabled={availableStock === 0}>
               Buy Now
             </Button>
           </div>

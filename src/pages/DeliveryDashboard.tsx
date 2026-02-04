@@ -8,14 +8,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Package, MapPin, Clock, CheckCircle2, Truck, LogOut, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Order {
   id: string;
   buyer_id: string;
   status: string;
-  order_items: { name: string; quantity: number; price: number }[];
+  order_items: { quantity: number; price: number; products: { name: string } | null }[];
   total_amount: number;
   delivery_address: string;
+  delivery_boy_id: string | null;
   created_at: string;
 }
 
@@ -33,6 +50,8 @@ export default function DeliveryDashboard() {
     completed: 0,
     earnings: 0,
   });
+  const [selectedMapOrder, setSelectedMapOrder] = useState<Order | null>(null);
+  const [orderToDeliver, setOrderToDeliver] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -52,8 +71,9 @@ export default function DeliveryDashboard() {
     setLoadingOrders(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("*, order_items(name, quantity, price)" as any)
-      .or(`delivery_id.eq.${user?.id},delivery_id.is.null`)
+      .select("*, order_items(quantity, price, products(name))" as any)
+      // Show orders that are 'pending' (ready for pickup) OR assigned to this user
+      .or(`status.eq.packed,delivery_boy_id.eq.${user?.id}`)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -62,11 +82,11 @@ export default function DeliveryDashboard() {
       const typedOrders = (data || []) as unknown as Order[];
       setOrders(typedOrders);
       
-      const pending = typedOrders.filter(o => o.status === "pending").length;
-      const inProgress = typedOrders.filter(o => ["assigned", "picked_up"].includes(o.status)).length;
-      const completed = typedOrders.filter(o => o.status === "delivered").length;
+      const pending = typedOrders.filter(o => o.status === "packed" && !o.delivery_boy_id).length;
+      const inProgress = typedOrders.filter(o => ["assigned", "out_for_delivery"].includes(o.status)).length;
+      const completed = typedOrders.filter(o => o.status === "delivered" && o.delivery_boy_id === user?.id).length;
       const earnings = typedOrders
-        .filter(o => o.status === "delivered")
+        .filter(o => o.status === "delivered" && o.delivery_boy_id === user?.id)
         .reduce((sum, o) => sum + Number(o.total_amount) * 0.1, 0);
       
       setStats({ pending, inProgress, completed, earnings });
@@ -74,25 +94,10 @@ export default function DeliveryDashboard() {
     setLoadingOrders(false);
   };
 
-  // Realtime subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel("delivery-orders")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => fetchOrders()
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
   const acceptOrder = async (orderId: string) => {
     const { error } = await supabase
       .from("orders")
-      .update({ delivery_id: user?.id, status: "assigned" } as any)
+      .update({ delivery_boy_id: user?.id, status: "assigned" })
       .eq("id", orderId);
 
     if (error) {
@@ -104,7 +109,7 @@ export default function DeliveryDashboard() {
     } else {
       toast({
         title: "Order accepted!",
-        description: "You can now pick up this order",
+        description: "You have accepted this order for delivery.",
       });
       fetchOrders();
     }
@@ -131,11 +136,53 @@ export default function DeliveryDashboard() {
     }
   };
 
+  // Realtime subscription
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("delivery-orders")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        (payload) => {
+          fetchOrders();
+
+          const newOrder = payload.new as any;
+          const oldOrder = payload.old as any;
+
+          // Notify if a new order is ready for pickup
+          if (
+            newOrder.status === "packed" &&
+            !newOrder.delivery_boy_id &&
+            (payload.eventType === "INSERT" || (payload.eventType === "UPDATE" && oldOrder?.status !== "packed"))
+          ) {
+            toast({
+              title: "New Order Available",
+              description: `Order #${newOrder.id.slice(0, 8)} is ready for pickup`,
+              action: (
+                <Button variant="default" size="sm" onClick={() => acceptOrder(newOrder.id)}>
+                  Accept
+                </Button>
+              ),
+              duration: 10000,
+            });
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { className: string; label: string }> = {
       pending: { className: "bg-yellow-100 text-yellow-800", label: "Pending" },
       assigned: { className: "bg-blue-100 text-blue-800", label: "Assigned" },
-      picked_up: { className: "bg-purple-100 text-purple-800", label: "Picked Up" },
+      accepted: { className: "bg-gray-100 text-gray-800", label: "Accepted" },
+      packed: { className: "bg-purple-100 text-purple-800", label: "Ready for Pickup" },
+      out_for_delivery: { className: "bg-blue-100 text-blue-800", label: "Out for Delivery" },
       delivered: { className: "bg-green-100 text-green-800", label: "Delivered" },
       cancelled: { className: "bg-red-100 text-red-800", label: "Cancelled" },
     };
@@ -161,8 +208,8 @@ export default function DeliveryDashboard() {
               <Truck className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">Delivery Dashboard</h1>
-              <p className="text-xs text-muted-foreground">Manage your deliveries</p>
+              <h1 className="text-xl font-bold text-foreground">Green Root Organics</h1>
+              <p className="text-xs text-muted-foreground">Delivery Dashboard</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -270,7 +317,17 @@ export default function DeliveryDashboard() {
                     
                     <div className="flex items-start gap-2 mb-3 text-sm">
                       <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <span>{order.delivery_address}</span>
+                      <div className="flex-1">
+                        <p>{order.delivery_address}</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-2 h-6 text-xs"
+                          onClick={() => setSelectedMapOrder(order)}
+                        >
+                          View on Map
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="mb-3">
@@ -278,7 +335,7 @@ export default function DeliveryDashboard() {
                       <div className="flex flex-wrap gap-2">
                         {order.order_items?.map((item, idx) => (
                           <Badge key={idx} variant="secondary">
-                            {item.name} x{item.quantity}
+                            {item.products?.name} x{item.quantity}
                           </Badge>
                         ))}
                       </div>
@@ -287,18 +344,18 @@ export default function DeliveryDashboard() {
                     <div className="flex items-center justify-between">
                       <p className="font-bold text-lg">₹{order.total_amount}</p>
                       <div className="flex gap-2">
-                        {order.status === "pending" && (
+                        {order.status === "packed" && (
                           <Button variant="fresh" size="sm" onClick={() => acceptOrder(order.id)}>
-                            Accept Order
+                            Pickup Order
                           </Button>
                         )}
                         {order.status === "assigned" && (
-                          <Button variant="fresh" size="sm" onClick={() => updateOrderStatus(order.id, "picked_up")}>
-                            Mark Picked Up
+                          <Button variant="fresh" size="sm" onClick={() => updateOrderStatus(order.id, "out_for_delivery")}>
+                            Start Delivery
                           </Button>
                         )}
-                        {order.status === "picked_up" && (
-                          <Button variant="fresh" size="sm" onClick={() => updateOrderStatus(order.id, "delivered")}>
+                        {order.status === "out_for_delivery" && (
+                          <Button variant="fresh" size="sm" onClick={() => setOrderToDeliver(order.id)}>
                             Mark Delivered
                           </Button>
                         )}
@@ -310,6 +367,46 @@ export default function DeliveryDashboard() {
             )}
           </CardContent>
         </Card>
+
+        <Dialog open={!!selectedMapOrder} onOpenChange={(open) => !open && setSelectedMapOrder(null)}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Delivery Location</DialogTitle>
+            </DialogHeader>
+            <div className="aspect-video w-full overflow-hidden rounded-md bg-muted">
+              <iframe
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedMapOrder?.delivery_address || "")}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={!!orderToDeliver} onOpenChange={(open) => !open && setOrderToDeliver(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Delivery</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to mark this order as delivered? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                if (orderToDeliver) {
+                  updateOrderStatus(orderToDeliver, "delivered");
+                  setOrderToDeliver(null);
+                }
+              }}>
+                Confirm Delivered
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

@@ -32,9 +32,9 @@ import { useSellerOrderAlert } from "@/hooks/useSellerOrderAlert";
 
 interface OrderItem {
   id: string;
-  name: string;
   quantity: number;
   price: number;
+  products: { name: string } | null;
 }
 
 interface Order {
@@ -42,8 +42,9 @@ interface Order {
   created_at: string;
   total_amount: number;
   status: string;
-  buyer_id: string;
+  user_id: string;
   order_items: OrderItem[];
+  delivery_address: string;
   profiles: { full_name: string } | null;
 }
 
@@ -65,27 +66,28 @@ export default function Orders() {
     const fetchOrders = async () => {
       setLoading(true);
 
-    const { data, error } = await supabase
-      .from("orders")
-      .select(`
+      let query = supabase
+        .from("orders")
+        .select(`
         id,
         created_at,
         total_amount,
         status,
-        buyer_id,
-        order_items (
+        delivery_address,
+        user_id,
+        order_items!inner (
           id,
-          name,
           quantity,
-          price
+          price,
+          products!inner ( name, seller_id )
         ),
         profiles (
           full_name
         )
-      `)
-      .eq("seller_id", user.id)
-      .order("created_at", { ascending: false });
+      ` as any)
+      .eq('order_items.products.seller_id', user.id);
 
+      const { data, error } = await query.order("created_at", { ascending: false });
 
       if (error) {
         console.error(error);
@@ -95,7 +97,7 @@ export default function Orders() {
           description: "Failed to load orders",
         });
       } else {
-        setOrders((data as any) || []);
+        setOrders((data as unknown as Order[]) || []);
       }
 
       setLoading(false);
@@ -111,7 +113,6 @@ export default function Orders() {
           event: "*",
           schema: "public",
           table: "orders",
-          filter: `seller_id=eq.${user.id}`,
         },
         fetchOrders
       )
@@ -136,6 +137,18 @@ export default function Orders() {
     return matchesSearch && matchesStatus;
   });
 
+  // Helper to get next status action
+  const getNextStatusAction = (currentStatus: string) => {
+    switch (currentStatus) {
+      case 'pending':
+        return { label: 'Accept Order', next: 'accepted', variant: 'default' as const };
+      case 'accepted':
+        return { label: 'Mark Packed', next: 'packed', variant: 'secondary' as const };
+      default:
+        return null;
+    }
+  };
+
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const paginatedOrders = filteredOrders.slice(
     (currentPage - 1) * itemsPerPage,
@@ -154,6 +167,10 @@ export default function Orders() {
         title: "Error",
         description: "Failed to update order status",
       });
+    } else {
+      toast({ title: "Success", description: `Order marked as ${status}` });
+      // Optimistic update or refetch
+      setOrders(orders.map(o => o.id === orderId ? { ...o, status } : o));
     }
   };
 
@@ -212,7 +229,7 @@ export default function Orders() {
                 <TableHead>Items</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -239,7 +256,7 @@ export default function Orders() {
                     <TableCell>
                       {order.order_items.map((i) => (
                         <div key={i.id}>
-                          {i.name} × {i.quantity}
+                          {i.products?.name} × {i.quantity}
                         </div>
                       ))}
                     </TableCell>
@@ -247,7 +264,19 @@ export default function Orders() {
                     <TableCell>
                       <Badge>{order.status}</Badge>
                     </TableCell>
-                    <TableCell>{formatDate(order.created_at)}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const action = getNextStatusAction(order.status);
+                        if (action) {
+                          return (
+                            <Button size="sm" variant={action.variant} onClick={() => updateStatus(order.id, action.next)}>
+                              {action.label}
+                            </Button>
+                          );
+                        }
+                        return <span className="text-xs text-muted-foreground">{formatDate(order.created_at)}</span>;
+                      })()}
+                    </TableCell>
                   </TableRow>
                 ))
               )}

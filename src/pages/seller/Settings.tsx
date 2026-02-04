@@ -8,8 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 
 export default function Settings() {
-  const [storeName, setStoreName] = useState("FreshCart Store");
-  const [storeEmail, setStoreEmail] = useState("store@freshcart.com");
+  const [storeName, setStoreName] = useState("Green Root Organics Store");
+  const [storeEmail, setStoreEmail] = useState("store@greenrootorganics.com");
   const [storePhone, setStorePhone] = useState("+91 9876543210");
   const [storeAddress, setStoreAddress] = useState("123 Market Street, City, State 12345");
   const [storeDescription, setStoreDescription] = useState(

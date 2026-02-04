@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductCard } from "@/components/ProductCard";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Based on your project structure, a shared product type would be ideal.
 // For now, we define it here.
@@ -32,6 +35,9 @@ export default function ProductGrid({ selectedCategory, searchQuery }: ProductGr
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     // Requirement 4: Fetch products from Supabase.
@@ -55,7 +61,7 @@ export default function ProductGrid({ selectedCategory, searchQuery }: ProductGr
         console.error("Error fetching products:", error);
         setError("Failed to load products. Please try again.");
       } else {
-        data || [];
+        setProducts(data || []);
       }
       setLoading(false);
     };
@@ -91,13 +97,23 @@ export default function ProductGrid({ selectedCategory, searchQuery }: ProductGr
     return <div className="text-center text-destructive py-8">{error}</div>;
   }
 
+  const urlSearchQuery = searchParams.get("search");
+  const activeSearchQuery = searchQuery || urlSearchQuery;
+
   const filteredProducts = products.filter((product) =>
-    searchQuery ? product.name.toLowerCase().includes(searchQuery.toLowerCase()) : true
+    activeSearchQuery ? product.name.toLowerCase().includes(activeSearchQuery.toLowerCase()) : true
   );
 
   return (
     <section className="space-y-6">
-      <h2 className="text-3xl font-bold tracking-tight">{heading}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold tracking-tight">{heading}</h2>
+        {user && (
+          <Button variant="outline" onClick={() => navigate("/my-orders")}>
+            My Orders
+          </Button>
+        )}
+      </div>
 
       {filteredProducts.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">

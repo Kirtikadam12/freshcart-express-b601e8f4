@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft, ShoppingBag, Truck, Store } from "lucide-react";
+import { Loader2, ArrowLeft, ShoppingBag, Truck, Store, Leaf } from "lucide-react";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 
@@ -130,13 +130,13 @@ export default function Auth() {
           let redirectPath = "/";
           
           if (selectedRole === "delivery") {
-            description = "Welcome to FreshCart Delivery!";
+            description = "Welcome to Green Root Organics Delivery!";
             redirectPath = "/delivery/dashboard";
           } else if (selectedRole === "seller") {
-            description = "Welcome to FreshCart Seller! Start managing your products.";
+            description = "Welcome to Green Root Organics Seller! Start managing your products.";
             redirectPath = "/seller/dashboard";
           } else {
-            description = "Welcome to FreshCart. Start shopping!";
+            description = "Welcome to Green Root Organics. Start shopping!";
             redirectPath = "/";
           }
 
@@ -180,8 +180,8 @@ export default function Auth() {
       <div className="flex-1 flex items-center justify-center p-4">
         <Card className="w-full max-w-md shadow-elevated border-0">
           <CardHeader className="text-center pb-2">
-            <div className="mx-auto w-16 h-16 gradient-fresh rounded-2xl flex items-center justify-center text-4xl mb-4">
-              🥬
+            <div className="mx-auto w-16 h-16 gradient-fresh rounded-2xl flex items-center justify-center mb-4 text-white">
+              <Leaf className="h-8 w-8" />
             </div>
             <CardTitle className="text-2xl font-bold">
               {isLogin ? "Welcome Back!" : "Create Account"}
@@ -189,7 +189,7 @@ export default function Auth() {
             <CardDescription>
               {isLogin 
                 ? "Sign in to continue" 
-                : "Join FreshCart as a buyer, seller, or delivery partner"}
+                : "Join Green Root Organics as a buyer, seller, or delivery partner"}
             </CardDescription>
           </CardHeader>
           

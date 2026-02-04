@@ -3,6 +3,7 @@ import { Header } from "@/components/Header";
 import { HeroBanner } from "@/components/HeroBanner";
 import { CategoryNav } from "@/components/CategoryNav";
 import ProductGrid from "@/components/ProductGrid";
+import { Leaf } from "lucide-react";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] =
@@ -28,14 +29,18 @@ const Index = () => {
       <footer className="bg-card border-t border-border py-8 mt-12">
         <div className="container mx-auto text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="w-10 h-10 gradient-fresh rounded-xl flex items-center justify-center text-2xl">
-              🥬
+            <div className="w-10 h-10 gradient-fresh rounded-xl flex items-center justify-center text-white">
+              <Leaf className="h-6 w-6" />
             </div>
-            <span className="text-xl font-bold">FreshCart</span>
+            <span className="text-xl font-bold">Green Root Organics</span>
           </div>
           <p className="text-muted-foreground text-sm">
-            © 2026 FreshCart. Farm fresh vegetables and fruits delivered to your doorstep.
+            © 2026 Green Root Organics. Farm fresh vegetables and fruits delivered to your doorstep.
           </p>
+          <div className="mt-4 text-sm text-muted-foreground space-y-1">
+            <p>Email: greenrootorganics10@gmail.com</p>
+            <p>Phone: +91 9604001392</p>
+          </div>
           <div className="flex items-center justify-center gap-6 mt-4 text-sm text-muted-foreground">
             <a href="#" className="hover:text-primary transition-colors">About Us</a>
             <a href="#" className="hover:text-primary transition-colors">Contact</a>

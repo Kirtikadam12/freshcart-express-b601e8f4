@@ -1,4 +1,4 @@
-import { Search, ShoppingCart, MapPin, User, ChevronDown, LogOut, Truck, Store, Package } from "lucide-react";
+import { Search, ShoppingCart, MapPin, User, ChevronDown, LogOut, Truck, Store, Package, Leaf } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,11 +47,11 @@ export function Header({ searchQuery, onSearchChange }: HeaderProps) {
         <div className="flex items-center gap-6 py-4">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 gradient-fresh rounded-xl flex items-center justify-center text-2xl">
-              🥬
+            <div className="w-10 h-10 gradient-fresh rounded-xl flex items-center justify-center text-white">
+              <Leaf className="h-6 w-6" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-foreground">FreshCart</h1>
+              <h1 className="text-xl font-bold text-foreground">Green Root Organics</h1>
               <p className="text-xs text-muted-foreground">Farm Fresh Daily</p>
             </div>
           </div>

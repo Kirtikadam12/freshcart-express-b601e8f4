@@ -65,7 +65,7 @@ export default function ProductsList() {
           description: "Failed to load products. Please try again.",
         });
       } else {
-        data || [];
+        setProducts(data || []);
       }
     } catch (err) {
       console.error("Unexpected error:", err);
